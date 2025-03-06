@@ -5,6 +5,8 @@ This project is an **audio visualizer** that utilizes **Chart.js** to display re
 - A **bar chart** representing the frequency spectrum of the audio.
 - A **flame graph** that layers past frequency data over time, mimicking fire-like visuals.
 
+Check out the demo here [Vist Demo](https://chartjs-audio-visualizer.netlify.app)
+
 ## Features
 - Real-time audio visualization using the Web Audio API.
 - Interactive **bar chart** to see frequency intensity.
