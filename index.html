@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Audio Visualizer with Flame Graph</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <audio id="audio" controls crossorigin="anonymous">
+    <source src="audio.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+  </audio>
+  <h2>Bar Graph Visualization</h2>
+  <canvas id="barCanvas"></canvas>
+  <h2>Flam Graph Visualization</h2>
+  <canvas id="flameCanvas"></canvas>
+
+  <script>
+    class AudioVisualizer {
+      constructor(audioElement, barCanvasElement, flameCanvasElement) {
+        this.audioElement = audioElement;
+        this.barCanvas = barCanvasElement;
+        this.flameCanvas = flameCanvasElement;
+        this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        this.analyser = this.audioCtx.createAnalyser();
+        this.source = this.audioCtx.createMediaElementSource(this.audioElement);
+        this.source.connect(this.analyser);
+        this.analyser.connect(this.audioCtx.destination);
+        this.analyser.fftSize = 64;
+        this.bufferLength = this.analyser.frequencyBinCount;
+        this.dataArray = new Uint8Array(this.bufferLength);
+        this.history = Array.from({length: 20}, () => Array(this.bufferLength).fill(0));
+        this.barChart = this.createBarChart();
+        this.flameChart = this.createFlameChart();
+        this.animate = this.animate.bind(this);
+      }
+
+      createBarChart() {
+        return new Chart(this.barCanvas, {
+          type: 'bar',
+          data: {
+            labels: Array.from({length: this.bufferLength}, (_, i) => i),
+            datasets: [{
+              label: 'Frequency',
+              data: Array(this.bufferLength).fill(0),
+              backgroundColor: 'rgba(0, 123, 255, 0.5)',
+              borderColor: 'rgba(0, 123, 255, 1)',
+              borderWidth: 1
+            }]
+          },
+          options: {
+            responsive: true,
+            animation: false,
+            scales: {
+              y: {beginAtZero: true, max: 255}
+            }
+          }
+        });
+      }
+
+      createFlameChart() {
+        return new Chart(this.flameCanvas, {
+          type: 'line',
+          data: {
+            labels: Array.from({length: this.bufferLength}, (_, i) => i),
+            datasets: this.history.map((_, i) => ({
+              label: `Layer ${i}`,
+              data: Array(this.bufferLength).fill(0),
+              borderColor: `rgba(${255 - i * 10}, ${50 + i * 5}, 0, 1)`,
+              backgroundColor: `rgba(${255 - i * 10}, ${50 + i * 5}, 0, 0.3)`,
+              borderWidth: 1,
+              fill: true
+            }))
+          },
+          options: {
+            responsive: true,
+            animation: false,
+            scales: {
+              y: {beginAtZero: true, max: 255}
+            },
+            plugins: {
+              legend: {display: false}
+            }
+          }
+        });
+      }
+
+      start() {
+        if (this.audioCtx.state === "suspended") {
+          this.audioCtx.resume().then(() => {
+            this.audioElement.play();
+          });
+        } else {
+          this.audioElement.play();
+        }
+        this.animate();
+      }
+
+      animate() {
+        requestAnimationFrame(this.animate);
+        this.analyser.getByteFrequencyData(this.dataArray);
+
+        // Update bar chart
+        this.barChart.data.datasets[0].data = Array.from(this.dataArray);
+        this.barChart.update();
+
+        // Shift history for flame graph
+        this.history.pop();
+        this.history.unshift(Array.from(this.dataArray));
+
+        // Update flame chart layers
+        this.flameChart.data.datasets.forEach((dataset, i) => {
+          dataset.data = this.history[i];
+        });
+        this.flameChart.update();
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const audio = document.getElementById('audio');
+      const barCanvas = document.getElementById('barCanvas').getContext('2d');
+      const flameCanvas = document.getElementById('flameCanvas').getContext('2d');
+      const visualizer = new AudioVisualizer(audio, barCanvas, flameCanvas);
+      audio.addEventListener("play", () => visualizer.start());
+    });
+  </script>
+</body>
+
+</html>
